@@ -1,6 +1,14 @@
 # Snapshot
 
-A screen recorder and webcam capture CLI base on `ffmpeg`.
+Record screen, webcam and mic with a CLI.
+
+## Features
+
+- Based on `ffmpeg`.
+- CLI-based, no GUI.
+- Easy to script.
+- Easy to add to launchers or bind to hot keys.
+- CTRL+C to save recordings.
 
 ## Usage
 
