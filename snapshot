@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+# Linux/X11 screen + circular webcam + microphone recorder.
+set -Eeuo pipefail
+
+die() { printf 'Error: %s\n' "$*" >&2; exit 1; }
+usage() {
+  cat <<'EOF'
+Usage: ./snapshot [options] [output.mp4]
+
+Records the XRandR primary monitor, webcam and microphone; press Ctrl+C to finish.
+  --list                 Show monitor, camera and microphone choices
+  --monitor NAME         Override the primary monitor (e.g. DP-1)
+  --camera DEVICE        Webcam device (default: /dev/video0)
+  --mic SOURCE           PulseAudio/PipeWire source (default: default)
+  --camera-size WxH      Supported webcam mode (default: 640x480)
+  --camera-fps N         Supported webcam frame rate (default: 30)
+  --camera-format FMT    Optional input format, e.g. mjpeg or yuyv422
+  --fps N               Screen/output frame rate (default: 30)
+  --size N              Face-circle diameter in pixels (default: 600)
+  --margin N            Distance from bottom/side in pixels (default: 24)
+  --position POSITION   center, left or right (default: right)
+  --no-mirror            Disable webcam horizontal mirroring
+  --demo                 Export a 3-second synthetic example; no devices opened
+  --dry-run              Print capture/export commands without recording
+  -h, --help             Show this help
+
+Default output: ./recording-YYYYmmdd-HHMMSS.mp4
+Requires ffmpeg, xrandr, and PulseAudio (or PipeWire's PulseAudio compatibility).
+EOF
+}
+
+monitor='' camera=/dev/video0 mic=default camera_size=640x480 camera_fps=30
+camera_format='' fps=30 size=600 margin=24 position=right mirror=1 demo=0 dry=0
+output=''
+while (($#)); do
+  case "$1" in
+    -h|--help) usage; exit 0 ;;
+    --list)
+      printf '\nMonitors (* / primary marks the main monitor):\n'
+      xrandr --query || true
+      printf '\nCameras:\n'
+      if command -v v4l2-ctl >/dev/null; then v4l2-ctl --list-devices || true
+      else find /dev -maxdepth 1 -name 'video*' -print; fi
+      printf '\nMicrophones (avoid .monitor sources for mic-only audio):\n'
+      if command -v pactl >/dev/null; then
+        printf 'Current default source: '
+        pactl get-default-source || true
+        pactl list short sources || true
+      else printf 'Install pulseaudio-utils to list microphones.\n'; fi
+      exit 0 ;;
+    --no-mirror) mirror=0; shift ;;
+    --demo) demo=1; shift ;;
+    --dry-run) dry=1; shift ;;
+    --monitor|--camera|--mic|--camera-size|--camera-fps|--camera-format|--fps|--size|--margin|--position)
+      (($# >= 2)) || die "Missing value for $1"
+      key=${1#--}; key=${key//-/_}; printf -v "$key" '%s' "$2"; shift 2 ;;
+    -*) die "Unknown option: $1" ;;
+    *) [[ -z $output ]] || die 'Only one output filename is allowed'; output=$1; shift ;;
+  esac
+done
+command -v ffmpeg >/dev/null || die 'Install ffmpeg first.'
+for key in fps camera_fps size; do
+  [[ ${!key} =~ ^[1-9][0-9]*$ ]] || die "$key must be a positive integer"
+done
+[[ $margin =~ ^(0|[1-9][0-9]*)$ ]] || die 'margin must be a nonnegative integer'
+[[ $camera_size =~ ^[1-9][0-9]*x[1-9][0-9]*$ ]] || die 'camera-size must be WxH'
+case "$position" in
+  center) overlay_x='(W-w)/2' ;;
+  left) overlay_x=$margin ;;
+  right) overlay_x="W-w-$margin" ;;
+  *) die 'position must be center, left or right' ;;
+esac
+output=${output:-"recording-$(date +%Y%m%d-%H%M%S).mp4"}
+[[ $output == *.mp4 ]] || die 'Output filename must end in .mp4'
+[[ $output == /* ]] || output="$PWD/$output"
+intermediate=${output%.mp4}.mkv
+[[ ! -e $output && ! -e $intermediate ]] || die 'Output MP4 or intermediate MKV already exists; choose another filename.'
+
+if ((demo)); then
+  width=1280 height=720
+  inputs=(-f lavfi -i "testsrc2=size=${width}x${height}:rate=$fps"
+          -f lavfi -i "testsrc=size=640x480:rate=$camera_fps"
+          -f lavfi -i 'sine=frequency=440:sample_rate=48000')
+else
+  [[ ${XDG_SESSION_TYPE:-x11} != wayland ]] || die 'This script requires an X11 session. Log into an Xorg session; x11grab cannot capture a Wayland desktop.'
+  [[ -n ${DISPLAY:-} ]] || die 'DISPLAY is unset; run this in your desktop terminal.'
+  command -v xrandr >/dev/null || die 'Install x11-xserver-utils for xrandr.'
+  layout=$(xrandr --query) || die 'Cannot query displays; run this in your desktop terminal.'
+  # Restrict capture to one active output, never the entire virtual desktop.
+  geometry=$(awk -v name="$monitor" '
+    $2 == "connected" && ((name != "" && $1 == name) || (name == "" && $3 == "primary")) {
+      for (i=3; i<=NF; i++) if ($i ~ /^[0-9]+x[0-9]+\+[0-9]+\+[0-9]+$/) {print $i; exit}
+    }' <<< "$layout")
+  if [[ -z $geometry && -z $monitor ]]; then
+    mapfile -t active < <(awk '$2 == "connected" {for (i=3;i<=NF;i++) if ($i ~ /^[0-9]+x[0-9]+\+[0-9]+\+[0-9]+$/) print $i}' <<< "$layout")
+    ((${#active[@]} == 1)) || die 'No primary monitor set. Use --list and --monitor NAME.'
+    geometry=${active[0]}
+  fi
+  [[ $geometry =~ ^([0-9]+)x([0-9]+)\+([0-9]+)\+([0-9]+)$ ]] || die 'Selected monitor is not active or its geometry is unsupported.'
+  width=${BASH_REMATCH[1]} height=${BASH_REMATCH[2]} x=${BASH_REMATCH[3]} y=${BASH_REMATCH[4]}
+  [[ -c $camera && -r $camera ]] || die "Cannot read webcam $camera. Use --list to choose a camera."
+  # Resolve and print the default source when pactl is available.
+  if [[ $mic == default ]] && command -v pactl >/dev/null; then
+    resolved_mic=$(pactl get-default-source 2>/dev/null) || resolved_mic=''
+    [[ -z $resolved_mic ]] || mic=$resolved_mic
+  fi
+  camera_node=$(readlink -f -- "$camera")
+  camera_label=''
+  if [[ -r /sys/class/video4linux/${camera_node##*/}/name ]]; then
+    camera_label=$(cat "/sys/class/video4linux/${camera_node##*/}/name")
+  fi
+  printf 'Webcam: %s%s\nMicrophone source: %s\n' "$camera" "${camera_label:+ ($camera_label)}" "$mic"
+  inputs=(-thread_queue_size 8 -use_wallclock_as_timestamps 1 -f x11grab -probesize 32 -analyzeduration 0
+          -framerate "$fps" -video_size "${width}x${height}" -draw_mouse 1 -i "${DISPLAY}+${x},${y}"
+          -thread_queue_size 8 -use_wallclock_as_timestamps 1 -f v4l2 -probesize 32 -analyzeduration 0
+          -framerate "$camera_fps" -video_size "$camera_size")
+  [[ -z $camera_format ]] || inputs+=(-input_format "$camera_format")
+  inputs+=(-i "$camera" -thread_queue_size 512 -use_wallclock_as_timestamps 1
+           -f pulse -i "$mic")
+fi
+((size + 2 * margin <= width && size + 2 * margin <= height)) || die 'Circle and margin must fit inside the selected monitor.'
+flip=''; ((mirror)) && flip='hflip,'
+graph="[1:v]crop='min(iw,ih)':'min(iw,ih)',scale=$size:$size,setsar=1,${flip}format=yuv420p,split[cam][masksrc];[masksrc]trim=end_frame=1,format=gray,geq=lum='255*clip($size/2-hypot(X-(W-1)/2,Y-(H-1)/2),0,1)',loop=loop=-1:size=1:start=0,setpts=N/($camera_fps*TB)[mask];[cam][mask]alphamerge=shortest=1[face];[0:v][face]overlay=x=$overlay_x:y=H-h-$margin:eof_action=pass,scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p[v];[2:a]aresample=async=1:first_pts=0[a]"
+capture=(ffmpeg -hide_banner -nostdin -n -copyts -start_at_zero "${inputs[@]}"
+         -filter_complex_threads 1 -filter_complex "$graph" -map '[v]' -map '[a]'
+         -c:v libx264 -preset ultrafast -tune zerolatency -crf 20 -r "$fps" -c:a aac -b:a 160k)
+((demo)) && capture+=(-t 3)
+capture+=("$intermediate")
+export_cmd=(ffmpeg -hide_banner -nostdin -n -i "$intermediate" -map 0 -c copy -movflags +faststart "$output")
+if ((dry)); then
+  printf '%q ' "${capture[@]}"; printf '\n'
+  printf '%q ' "${export_cmd[@]}"; printf '\n'
+  exit 0
+fi
+mkdir -p "$(dirname "$output")"
+printf 'Recording to %s\nPress Ctrl+C to stop and export MP4.\n' "$intermediate"
+# FFmpeg handles Ctrl+C by finalizing the file; continue to remux afterward.
+log=${output%.mp4}.capture.log
+printf 'Capture log: %s\n' "$log"
+stop_requested=0
+trap 'stop_requested=1' INT
+status=0
+# Keep tee alive through Ctrl+C so FFmpeg can finish writing diagnostics.
+"${capture[@]}" 2> >(trap '' INT; tee -a "$log" >&2) || status=$?
+trap - INT
+if ((status != 0 && status != 255 && status != 130)); then
+  die "Capture failed (exit $status). Any partial recording remains at $intermediate; diagnostics: $log"
+fi
+if ((!demo && !stop_requested)); then
+  printf 'Warning: capture ended without Ctrl+C (exit %s). Check %s.\n' "$status" "$log" >&2
+fi
+[[ -s $intermediate ]] || die "No recording was produced. Check $log"
+"${export_cmd[@]}" || die "Export failed; your recording remains at $intermediate"
+printf '\nExported: %s\nOriginal retained: %s\n' "$output" "$intermediate"
