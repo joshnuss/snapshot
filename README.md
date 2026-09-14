@@ -8,7 +8,7 @@ Record your screen, webcam and mic with a CLI.
 - CLI-based, no GUI.
 - Easy to script.
 - Easy to add to launchers or bind to hot keys.
-- CTRL+C to save recordings.
+- Click the recording tray icon or press Ctrl+C to save recordings.
 
 ## Usage
 
@@ -28,6 +28,12 @@ snapshot --monitor DP-1 \
 
 Press <kbd>Ctrl</kbd> + <kbd>C</kbd> to stop recording and export the MP4.
 
+## System tray
+
+A red recording icon appears in the system tray while capturing. Click it to stop recording and export the MP4, or right-click and choose **Stop recording and save**. The icon disappears when capture finishes; the program exits after export. Ctrl+C continues to work.
+
+Tray support uses Python 3 with GTK 3 (`python3-gi` and `gir1.2-gtk-3.0` on Ubuntu/Debian). Keep `snapshot-tray.py` alongside the `snapshot` executable, including when installing or copying it. The icon targets X11 desktops with a traditional system tray, such as Cinnamon. If tray support is unavailable, recording continues and a message directs you to use Ctrl+C. Use `--no-tray` to disable it.
+
 ## Customizing
 
 Many options are customizable.
@@ -44,6 +50,7 @@ Many options are customizable.
 | `--size N` | `600` | Webcam circle diameter in pixels. |
 | `--margin N` | `24` | Gap from the bottom and applicable side edge, in pixels. |
 | `--position POSITION` | `right` | Place the circle at bottom `left`, `center`, or `right`. |
+| `--no-tray` | Tray enabled | Disable the recording tray icon. |
 | `--no-mirror` | Mirroring enabled | Disable horizontal webcam mirroring. |
 | `--list` | — | List monitors, cameras, and audio sources, then exit. |
 | `--demo` | — | Generate a three-second synthetic recording without accessing devices. |
