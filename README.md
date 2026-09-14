@@ -20,7 +20,7 @@ snapshot --help
 snapshot my-recording.mp4
 
 # optional: choose the monitor, camera, mic, etc..
-snapshot --monitor DP-1 \
+snapshot --monitor HDMI-1 \
   --camera /dev/video0 \
   --position right \
   --fps 15
@@ -28,15 +28,9 @@ snapshot --monitor DP-1 \
 
 Press <kbd>Ctrl</kbd> + <kbd>C</kbd> to stop recording and export the MP4.
 
-## System tray
+## Options
 
-A red recording icon appears in the system tray while capturing. Click it to stop recording and export the MP4, or right-click and choose **Stop recording and save**. The icon disappears when capture finishes; the program exits after export. Ctrl+C continues to work.
-
-Tray support uses Python 3 with GTK 3 (`python3-gi` and `gir1.2-gtk-3.0` on Ubuntu/Debian). Keep `snapshot-tray.py` alongside the `snapshot` executable, including when installing or copying it. The icon targets X11 desktops with a traditional system tray, such as Cinnamon. If tray support is unavailable, recording continues and a message directs you to use Ctrl+C. Use `--no-tray` to disable it.
-
-## Customizing
-
-Many options are customizable.
+The cli accepts this parameters:
 
 | Option | Default | Explanation |
 |---|---|---|
