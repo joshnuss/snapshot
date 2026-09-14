@@ -4,11 +4,13 @@ Record your screen, webcam and mic with a CLI.
 
 ## Features
 
-- Based on `ffmpeg`.
+- Developer friendly workflow.
 - CLI-based, no GUI.
-- Easy to script.
-- Easy to add to launchers or bind to hot keys.
-- Click the recording tray icon or press Ctrl+C to save recordings.
+- Fully scriptable.
+- Add to launchers or bind to hot keys.
+- Ctrl+C to save recordings.
+- System tray icon.
+- Based on `ffmpeg`.
 
 ## Usage
 
