@@ -25,7 +25,7 @@ snapshot --monitor HDMI-1 \
   --position right \
   --fps 15
 
-# list all available devices
+# list available devices
 snapshot --list
 ```
 
