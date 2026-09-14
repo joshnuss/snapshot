@@ -142,12 +142,12 @@ printf 'Capture log: %s\n' "$log"
 stop_requested=0
 trap 'stop_requested=1' INT USR1
 status=0
-tray_helper="$(dirname "$(readlink -f -- "${BASH_SOURCE[0]}")")/snapshot-tray.py"
+tray_helper="$(dirname "$(readlink -f -- "${BASH_SOURCE[0]}")")/tray.py"
 if ((tray)); then
   if command -v python3 >/dev/null && [[ -f $tray_helper ]]; then
     capture=(python3 "$tray_helper" "${capture[@]}")
   else
-    printf 'Tray unavailable: install Python 3 and keep snapshot-tray.py beside snapshot. Use Ctrl+C to stop.\n' >&2
+    printf 'Tray unavailable: install Python 3 and keep tray.py beside snapshot. Use Ctrl+C to stop.\n' >&2
   fi
 fi
 # Keep tee alive through Ctrl+C so FFmpeg can finish writing diagnostics.
