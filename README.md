@@ -24,6 +24,9 @@ snapshot --monitor HDMI-1 \
   --camera /dev/video0 \
   --position right \
   --fps 15
+
+# list all available devices
+snapshot --list
 ```
 
 Press <kbd>Ctrl</kbd> + <kbd>C</kbd> to stop recording and export the MP4.
