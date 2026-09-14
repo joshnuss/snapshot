@@ -32,22 +32,22 @@ Press <kbd>Ctrl</kbd> + <kbd>C</kbd> to stop recording and export the MP4.
 
 | Option | Default | Explanation |
 |---|---|---|
-| <span style="white-space: nowrap;"><code>--monitor&nbsp;NAME</code></span> | Primary monitor | Select the screen to record, such as `HDMI-1`. |
-| <span style="white-space: nowrap;"><code>--camera&nbsp;DEVICE</code></span> | `/dev/video0` | Select the webcam device. |
-| <span style="white-space: nowrap;"><code>--mic&nbsp;SOURCE</code></span> | `default` | Select the PulseAudio/PipeWire audio source. |
-| <span style="white-space: nowrap;"><code>--camera-size&nbsp;WxH</code></span> | `640x480` | Webcam capture resolution; must be supported by the camera. |
-| <span style="white-space: nowrap;"><code>--camera-fps&nbsp;N</code></span> | `30` | Webcam frame rate; must be supported by the camera. |
-| <span style="white-space: nowrap;"><code>--camera-format&nbsp;FMT</code></span> | Device default | Webcam input format, such as `mjpeg` or `yuyv422`. |
-| <span style="white-space: nowrap;"><code>--fps&nbsp;N</code></span> | `30` | Screen capture and output frame rate. |
-| <span style="white-space: nowrap;"><code>--size&nbsp;N</code></span> | `600` | Webcam circle diameter in pixels. |
-| <span style="white-space: nowrap;"><code>--margin&nbsp;N</code></span> | `24` | Gap from the bottom and applicable side edge, in pixels. |
-| <span style="white-space: nowrap;"><code>--position&nbsp;POSITION</code></span> | `right` | Place the circle at bottom `left`, `center`, or `right`. |
-| <span style="white-space: nowrap;"><code>--no-mirror</code></span> | Mirroring enabled | Disable horizontal webcam mirroring. |
-| <span style="white-space: nowrap;"><code>--list</code></span> | — | List monitors, cameras, and audio sources, then exit. |
-| <span style="white-space: nowrap;"><code>--demo</code></span> | — | Generate a three-second synthetic recording without accessing devices. |
-| <span style="white-space: nowrap;"><code>--dry-run</code></span> | — | Print FFmpeg commands without recording; live device checks still run. |
-| <span style="white-space: nowrap;"><code>-h</code>,&nbsp;<code>--help</code></span> | — | Show usage and exit. |
-| <span style="white-space: nowrap;"><code>output.mp4</code></span> | `recording-YYYYmmdd-HHMMSS.mp4` | Optional output filename; must end in `.mp4`. Existing recordings aren’t overwritten. |
+| <code>--monitor&nbsp;NAME</code> | Primary monitor | Select the screen to record, such as `HDMI-1`. |
+| <code>--camera&nbsp;DEVICE</code> | `/dev/video0` | Select the webcam device. |
+| <code>--mic&nbsp;SOURCE</code> | `default` | Select the PulseAudio/PipeWire audio source. |
+| <code>--camera-size&nbsp;WxH</code> | `640x480` | Webcam capture resolution; must be supported by the camera. |
+| <code>--camera-fps&nbsp;N</code> | `30` | Webcam frame rate; must be supported by the camera. |
+| <code>--camera-format&nbsp;FMT</code> | Device default | Webcam input format, such as `mjpeg` or `yuyv422`. |
+| <code>--fps&nbsp;N</code> | `30` | Screen capture and output frame rate. |
+| <code>--size&nbsp;N</code> | `600` | Webcam circle diameter in pixels. |
+| <code>--margin&nbsp;N</code> | `24` | Gap from the bottom and applicable side edge, in pixels. |
+| <code>--position&nbsp;POSITION</code> | `right` | Place the circle at bottom `left`, `center`, or `right`. |
+| <code>--no-mirror</code> | Mirroring enabled | Disable horizontal webcam mirroring. |
+| <code>--list</code> | — | List monitors, cameras, and audio sources, then exit. |
+| <code>--demo</code> | — | Generate a three-second synthetic recording without accessing devices. |
+| <code>--dry-run</code> | — | Print FFmpeg commands without recording; live device checks still run. |
+| <code>-h</code>,&nbsp;<code>--help</code> | — | Show usage and exit. |
+| <code>output.mp4</code> | `recording-YYYYmmdd-HHMMSS.mp4` | Optional output filename; must end in `.mp4`. Existing recordings aren’t overwritten. |
 
 ## License
 
