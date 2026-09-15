@@ -8,7 +8,7 @@ usage() {
 Usage: ./snapshot [options] [output.mp4]
 
 Records the XRandR primary monitor, webcam and microphone; press Ctrl+C to finish.
-  --list                 Show monitor, camera and microphone choices
+  --devices                 Show monitor, camera and microphone choices
   --monitor NAME         Override the primary monitor (e.g. DP-1)
   --camera DEVICE        Webcam device (default: /dev/video0)
   --mic SOURCE           PulseAudio/PipeWire source (default: default)
@@ -30,25 +30,68 @@ Requires ffmpeg, xrandr, and PulseAudio (or PipeWire's PulseAudio compatibility)
 EOF
 }
 
+show_devices() {
+  local listing default_source device label found=0
+  printf '\nScreens  (--monitor NAME)\n'
+  if command -v xrandr >/dev/null && listing=$(xrandr --query 2>/dev/null); then
+    awk '
+      $2 == "connected" {
+        for (i=3; i<=NF; i++) {
+          if ($i ~ /^[0-9]+x[0-9]+[+-][0-9]+[+-][0-9]+$/) {
+            resolution=$i; sub(/[+-].*/, "", resolution)
+            printf "  %-16s %-12s %s\n", $1, resolution, ($3 == "primary" ? "(primary)" : "")
+            found=1; break
+          }
+        }
+      }
+      END {if (!found) print "  No active screens found."}
+    ' <<< "$listing"
+  else
+    printf '  Unavailable. Run in an X11 desktop with xrandr installed.\n'
+  fi
+
+  printf '\nCameras  (--camera DEVICE)\n'
+  if command -v v4l2-ctl >/dev/null && listing=$(v4l2-ctl --list-devices 2>/dev/null) && [[ -n $listing ]]; then
+    awk '
+      /^[^[:space:]]/ {label=$0; sub(/:$/, "", label)}
+      /^[[:space:]]*\/dev\/video/ {printf "  %-16s %s\n", $1, label; found=1}
+      END {if (!found) print "  No cameras found."}
+    ' <<< "$listing"
+  else
+    for device in /dev/video*; do
+      [[ -e $device ]] || continue
+      label='Video device'
+      [[ ! -r /sys/class/video4linux/${device##*/}/name ]] || label=$(cat "/sys/class/video4linux/${device##*/}/name")
+      printf '  %-16s %s\n' "$device" "$label"
+      found=1
+    done
+    ((found)) || printf '  No cameras found.\n'
+  fi
+
+  printf '\nAudio sources  (--mic SOURCE)\n'
+  if command -v pactl >/dev/null && listing=$(pactl list short sources 2>/dev/null); then
+    default_source=$(pactl get-default-source 2>/dev/null) || default_source=''
+    awk -v selected="$default_source" '
+      NF >= 2 {
+        note=($2 == selected ? " (default)" : "")
+        if ($2 ~ /\.monitor$/) note=note " [system audio]"
+        printf "  %s%s\n", $2, note; found=1
+      }
+      END {if (!found) print "  No audio sources found."}
+    ' <<< "$listing"
+  else
+    printf '  Unavailable. Check PulseAudio/PipeWire and install pulseaudio-utils.\n'
+  fi
+  printf '\nUse the names above with --monitor, --camera, and --mic.\n\n'
+}
+
 monitor='' camera=/dev/video0 mic=default camera_size=640x480 camera_fps=30
 camera_format='' fps=30 size=600 margin=24 position=right mirror=1 demo=0 dry=0 tray=1
 output=''
 while (($#)); do
   case "$1" in
     -h|--help) usage; exit 0 ;;
-    --list)
-      printf '\nMonitors (* / primary marks the main monitor):\n'
-      xrandr --query || true
-      printf '\nCameras:\n'
-      if command -v v4l2-ctl >/dev/null; then v4l2-ctl --list-devices || true
-      else find /dev -maxdepth 1 -name 'video*' -print; fi
-      printf '\nMicrophones (avoid .monitor sources for mic-only audio):\n'
-      if command -v pactl >/dev/null; then
-        printf 'Current default source: '
-        pactl get-default-source || true
-        pactl list short sources || true
-      else printf 'Install pulseaudio-utils to list microphones.\n'; fi
-      exit 0 ;;
+    --devices) show_devices; exit 0 ;;
     --no-tray) tray=0; shift ;;
     --no-mirror) mirror=0; shift ;;
     --demo) demo=1; shift ;;
@@ -95,12 +138,12 @@ else
     }' <<< "$layout")
   if [[ -z $geometry && -z $monitor ]]; then
     mapfile -t active < <(awk '$2 == "connected" {for (i=3;i<=NF;i++) if ($i ~ /^[0-9]+x[0-9]+\+[0-9]+\+[0-9]+$/) print $i}' <<< "$layout")
-    ((${#active[@]} == 1)) || die 'No primary monitor set. Use --list and --monitor NAME.'
+    ((${#active[@]} == 1)) || die 'No primary monitor set. Use --devices and --monitor NAME.'
     geometry=${active[0]}
   fi
   [[ $geometry =~ ^([0-9]+)x([0-9]+)\+([0-9]+)\+([0-9]+)$ ]] || die 'Selected monitor is not active or its geometry is unsupported.'
   width=${BASH_REMATCH[1]} height=${BASH_REMATCH[2]} x=${BASH_REMATCH[3]} y=${BASH_REMATCH[4]}
-  [[ -c $camera && -r $camera ]] || die "Cannot read webcam $camera. Use --list to choose a camera."
+  [[ -c $camera && -r $camera ]] || die "Cannot read webcam $camera. Use --devices to choose a camera."
   # Resolve and print the default source when pactl is available.
   if [[ $mic == default ]] && command -v pactl >/dev/null; then
     resolved_mic=$(pactl get-default-source 2>/dev/null) || resolved_mic=''

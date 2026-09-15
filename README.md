@@ -28,7 +28,7 @@ snapshot --monitor HDMI-1 \
   --fps 15
 
 # list available devices
-snapshot --list
+snapshot --devices
 ```
 
 Press <kbd>Ctrl</kbd> + <kbd>C</kbd> to stop recording and export the MP4.
@@ -51,7 +51,7 @@ The cli accepts this parameters:
 | `--position POSITION` | `right` | Place the circle at bottom `left`, `center`, or `right`. |
 | `--no-tray` | Tray enabled | Disable the recording tray icon. |
 | `--no-mirror` | Mirroring enabled | Disable horizontal webcam mirroring. |
-| `--list` | — | List monitors, cameras, and audio sources, then exit. |
+| `--devices` | — | List monitors, cameras, and audio sources, then exit. |
 | `--demo` | — | Generate a three-second synthetic recording without accessing devices. |
 | `--dry-run` | — | Print FFmpeg commands without recording; live device checks still run. |
 | `-h`, `--help` | — | Show usage and exit. |
