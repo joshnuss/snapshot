@@ -24,7 +24,7 @@ snapshot my-recording.mp4
 # optional: choose the monitor, camera, mic, etc..
 snapshot --monitor HDMI-1 \
   --camera /dev/video0 \
-  --position right \
+  --overlay-position right \
   --fps 15
 
 # list available devices
@@ -46,9 +46,9 @@ The cli accepts this parameters:
 | `--camera-fps N`      | `30`                            | Webcam frame rate; must be supported by the camera.                                   |
 | `--camera-format FMT` | Device default                  | Webcam input format, such as `mjpeg` or `yuyv422`.                                    |
 | `--fps N`             | `30`                            | Screen capture and output frame rate.                                                 |
-| `--size N`            | `600`                           | Webcam circle diameter in pixels.                                                     |
-| `--margin N`          | `24`                            | Gap from the bottom and applicable side edge, in pixels.                              |
-| `--position POSITION` | `right`                         | Place the circle at bottom `left`, `center`, or `right`.                              |
+| `--overlay-size N`            | `600`                           | Webcam circle diameter in pixels.                                                     |
+| `--overlay-margin N`          | `24`                            | Gap from the bottom and applicable side edge, in pixels.                              |
+| `--overlay-position POSITION` | `right`                         | Place the circle at bottom `left`, `center`, or `right`.                              |
 | `--no-tray`           | Tray enabled                    | Disable the recording tray icon.                                                      |
 | `--no-mirror`         | Mirroring enabled               | Disable horizontal webcam mirroring.                                                  |
 | `--devices`           | —                               | List available monitors, cameras, and audio sources.                                  |

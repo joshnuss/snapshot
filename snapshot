@@ -16,9 +16,9 @@ Records the XRandR primary monitor, webcam and microphone; press Ctrl+C to finis
   --camera-fps N         Supported webcam frame rate (default: 30)
   --camera-format FMT    Optional input format, e.g. mjpeg or yuyv422
   --fps N               Screen/output frame rate (default: 30)
-  --size N              Face-circle diameter in pixels (default: 600)
-  --margin N            Distance from bottom/side in pixels (default: 24)
-  --position POSITION   center, left or right (default: right)
+  --overlay-size N       Face-circle diameter in pixels (default: 600)
+  --overlay-margin N     Distance from bottom/side in pixels (default: 24)
+  --overlay-position POS center, left or right (default: right)
   --no-tray              Disable the recording tray icon
   --no-mirror            Disable webcam horizontal mirroring
   --demo                 Export a 3-second synthetic example; no devices opened
@@ -96,9 +96,9 @@ while (($#)); do
     --no-mirror) mirror=0; shift ;;
     --demo) demo=1; shift ;;
     --dry-run) dry=1; shift ;;
-    --monitor|--camera|--mic|--camera-size|--camera-fps|--camera-format|--fps|--size|--margin|--position)
+    --monitor|--camera|--mic|--camera-size|--camera-fps|--camera-format|--fps|--overlay-size|--overlay-margin|--overlay-position)
       (($# >= 2)) || die "Missing value for $1"
-      key=${1#--}; key=${key//-/_}; printf -v "$key" '%s' "$2"; shift 2 ;;
+      key=${1#--}; key=${key#overlay-}; key=${key//-/_}; printf -v "$key" '%s' "$2"; shift 2 ;;
     -*) die "Unknown option: $1" ;;
     *) [[ -z $output ]] || die 'Only one output filename is allowed'; output=$1; shift ;;
   esac
