@@ -5,7 +5,7 @@ set -Eeuo pipefail
 die() { printf 'Error: %s\n' "$*" >&2; exit 1; }
 usage() {
   cat <<'EOF'
-Usage: ./snapshot [options] [output.mp4]
+Usage: ./snapshot [options] [output.mp4 | path/to/dir]
 
 Records the XRandR primary monitor, webcam and microphone; press Ctrl+C to finish.
   --devices                 Show monitor, camera and microphone choices
@@ -28,7 +28,6 @@ Records the XRandR primary monitor, webcam and microphone; press Ctrl+C to finis
   -h, --help             Show this help
 
 Default output: ./recording-YYYYmmdd-HHMMSS.mp4
-Requires ffmpeg, xrandr, and PulseAudio (or PipeWire's PulseAudio compatibility).
 EOF
 }
 
@@ -101,7 +100,7 @@ while (($#)); do
       (($# >= 2)) || die "Missing value for $1"
       key=${1#--}; key=${key#overlay-}; key=${key//-/_}; printf -v "$key" '%s' "$2"; shift 2 ;;
     -*) die "Unknown option: $1" ;;
-    *) [[ -z $output ]] || die 'Only one output filename is allowed'; output=$1; shift ;;
+    *) [[ -z $output ]] || die 'Only one output path is allowed'; output=$1; shift ;;
   esac
 done
 command -v ffmpeg >/dev/null || die 'Install ffmpeg first.'
@@ -126,8 +125,12 @@ case "$vertical" in
   center) overlay_y='(H-h)/2' ;;
   bottom) overlay_y="H-h-$margin" ;;
 esac
-output=${output:-"recording-$(date +%Y%m%d-%H%M%S).mp4"}
-[[ $output == *.mp4 ]] || die 'Output filename must end in .mp4'
+if [[ -z $output || -d $output ]]; then
+  output="${output:-.}/recording-$(date +%Y%m%d-%H%M%S).mp4"
+fi
+if [[ ${output##*/} != *.* ]]; then
+  printf 'Warning: output filename has no extension: %s (writing MP4).\n' "$output" >&2
+fi
 [[ $output == /* ]] || output="$PWD/$output"
 intermediate=${output%.mp4}.mkv
 [[ ! -e $output && ! -e $intermediate ]] || die 'Output MP4 or intermediate MKV already exists; choose another filename.'
@@ -174,7 +177,7 @@ capture=(ffmpeg -hide_banner -nostdin -n -copyts -start_at_zero "${inputs[@]}"
          -filter_complex_threads 1 -filter_complex "$graph" -map '[v]' -map '[a]'
          -c:v libx264 -preset ultrafast -tune zerolatency -crf 20 -r "$fps" -c:a aac -b:a 160k)
 capture+=("$intermediate")
-export_cmd=(ffmpeg -hide_banner -nostdin -n -i "$intermediate" -map 0 -c copy -movflags +faststart "$output")
+export_cmd=(ffmpeg -hide_banner -nostdin -n -i "$intermediate" -map 0 -c copy -movflags +faststart -f mp4 "$output")
 if ((dry)); then
   printf '%q ' "${capture[@]}"; printf '\n'
   printf '%q ' "${export_cmd[@]}"; printf '\n'
