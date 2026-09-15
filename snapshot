@@ -17,8 +17,11 @@ Records the XRandR primary monitor, webcam and microphone; press Ctrl+C to finis
   --camera-format FMT    Optional input format, e.g. mjpeg or yuyv422
   --fps N               Screen/output frame rate (default: 30)
   --overlay-size N       Face-circle diameter in pixels (default: 600)
-  --overlay-margin N     Distance from bottom/side in pixels (default: 24)
-  --overlay-position POS center, left or right (default: right)
+  --overlay-margin N     Distance from selected edges in pixels (default: 24)
+  --overlay-position POS Placement (default: bottom-right):
+                         top-left, top-center, top-right,
+                         center-left, center, center-right,
+                         bottom-left, bottom-center, bottom-right
   --no-tray              Disable the recording tray icon
   --no-mirror            Disable webcam horizontal mirroring
   --demo                 Export a 3-second synthetic example; no devices opened
@@ -86,7 +89,7 @@ show_devices() {
 }
 
 monitor='' camera=/dev/video0 mic=default camera_size=640x480 camera_fps=30
-camera_format='' fps=30 size=600 margin=24 position=right mirror=1 demo=0 dry=0 tray=1
+camera_format='' fps=30 size=600 margin=24 position=bottom-right mirror=1 demo=0 dry=0 tray=1
 output=''
 while (($#)); do
   case "$1" in
@@ -110,10 +113,20 @@ done
 [[ $margin =~ ^(0|[1-9][0-9]*)$ ]] || die 'margin must be a nonnegative integer'
 [[ $camera_size =~ ^[1-9][0-9]*x[1-9][0-9]*$ ]] || die 'camera-size must be WxH'
 case "$position" in
-  center) overlay_x='(W-w)/2' ;;
+  center) vertical=center; horizontal=center ;;
+  top-left|top-center|top-right|center-left|center-right|bottom-left|bottom-center|bottom-right)
+    vertical=${position%%-*}; horizontal=${position#*-} ;;
+  *) die 'overlay-position must be top-left, top-center, top-right, center-left, center, center-right, bottom-left, bottom-center, or bottom-right' ;;
+esac
+case "$horizontal" in
   left) overlay_x=$margin ;;
+  center) overlay_x='(W-w)/2' ;;
   right) overlay_x="W-w-$margin" ;;
-  *) die 'position must be center, left or right' ;;
+esac
+case "$vertical" in
+  top) overlay_y=$margin ;;
+  center) overlay_y='(H-h)/2' ;;
+  bottom) overlay_y="H-h-$margin" ;;
 esac
 output=${output:-"recording-$(date +%Y%m%d-%H%M%S).mp4"}
 [[ $output == *.mp4 ]] || die 'Output filename must end in .mp4'
@@ -165,7 +178,7 @@ else
 fi
 ((size + 2 * margin <= width && size + 2 * margin <= height)) || die 'Circle and margin must fit inside the selected monitor.'
 flip=''; ((mirror)) && flip='hflip,'
-graph="[1:v]crop='min(iw,ih)':'min(iw,ih)',scale=$size:$size,setsar=1,${flip}format=yuv420p,split[cam][masksrc];[masksrc]trim=end_frame=1,format=gray,geq=lum='255*clip($size/2-hypot(X-(W-1)/2,Y-(H-1)/2),0,1)',loop=loop=-1:size=1:start=0,setpts=N/($camera_fps*TB)[mask];[cam][mask]alphamerge=shortest=1[face];[0:v][face]overlay=x=$overlay_x:y=H-h-$margin:eof_action=pass,scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p[v];[2:a]aresample=async=1:first_pts=0[a]"
+graph="[1:v]crop='min(iw,ih)':'min(iw,ih)',scale=$size:$size,setsar=1,${flip}format=yuv420p,split[cam][masksrc];[masksrc]trim=end_frame=1,format=gray,geq=lum='255*clip($size/2-hypot(X-(W-1)/2,Y-(H-1)/2),0,1)',loop=loop=-1:size=1:start=0,setpts=N/($camera_fps*TB)[mask];[cam][mask]alphamerge=shortest=1[face];[0:v][face]overlay=x=$overlay_x:y=$overlay_y:eof_action=pass,scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p[v];[2:a]aresample=async=1:first_pts=0[a]"
 capture=(ffmpeg -hide_banner -nostdin -n -copyts -start_at_zero "${inputs[@]}"
          -filter_complex_threads 1 -filter_complex "$graph" -map '[v]' -map '[a]'
          -c:v libx264 -preset ultrafast -tune zerolatency -crf 20 -r "$fps" -c:a aac -b:a 160k)

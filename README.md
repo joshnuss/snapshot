@@ -24,7 +24,7 @@ snapshot my-recording.mp4
 # optional: choose the monitor, camera, mic, etc..
 snapshot --monitor HDMI-1 \
   --camera /dev/video0 \
-  --overlay-position right \
+  --overlay-position bottom-right \
   --fps 15
 
 # list available devices
@@ -47,8 +47,8 @@ The cli accepts this parameters:
 | `--camera-format FMT` | Device default                  | Webcam input format, such as `mjpeg` or `yuyv422`.                                    |
 | `--fps N`             | `30`                            | Screen capture and output frame rate.                                                 |
 | `--overlay-size N`            | `600`                           | Webcam circle diameter in pixels.                                                     |
-| `--overlay-margin N`          | `24`                            | Gap from the bottom and applicable side edge, in pixels.                              |
-| `--overlay-position POSITION` | `right`                         | Place the circle at bottom `left`, `center`, or `right`.                              |
+| `--overlay-margin N`          | `24`                            | Gap from the selected edges, in pixels; centered axes ignore it.                              |
+| `--overlay-position POSITION` | `bottom-right` | `top-left`, `top-center`, `top-right`, `center-left`, `center`, `center-right`, `bottom-left`, `bottom-center`, or `bottom-right`. |
 | `--no-tray`           | Tray enabled                    | Disable the recording tray icon.                                                      |
 | `--no-mirror`         | Mirroring enabled               | Disable horizontal webcam mirroring.                                                  |
 | `--devices`           | —                               | List available monitors, cameras, and audio sources.                                  |
