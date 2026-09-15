@@ -52,7 +52,6 @@ The cli accepts this parameters:
 | `--no-tray`           | Tray enabled                    | Disable the recording tray icon.                                                      |
 | `--no-mirror`         | Mirroring enabled               | Disable horizontal webcam mirroring.                                                  |
 | `--devices`           | —                               | List available monitors, cameras, and audio sources.                                  |
-| `--demo`              | —                               | Generate a three-second synthetic recording without accessing devices.                |
 | `--dry-run`           | —                               | Print FFmpeg commands without recording; live device checks still run.                |
 | `-h`, `--help`        | —                               | Show help                                                                             |
 | `output.mp4`          | `recording-YYYYmmdd-HHMMSS.mp4` | Optional output filename; must end in `.mp4`. Existing recordings aren’t overwritten. |
