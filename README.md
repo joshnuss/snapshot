@@ -10,6 +10,7 @@ Record your screen, webcam and mic with a CLI.
 - Add to launchers or bind to hot keys.
 - <kbd>Ctrl</kbd> + <kbd>C</kbd> to save recordings.
 - Displays a system tray icon when running.
+- Exports to mp4 or kdenlive.
 - Based on `ffmpeg`.
 
 ## Usage
@@ -24,6 +25,9 @@ snapshot ~/Recordings/screencast.mp4
 # record to a specific folder (generated name recording-YYYYMMDD-HHMMSS.mp4)
 snapshot ~/Recordings
 
+# record and create a kednlive project
+snapshot --export kdenlive
+
 # optional: choose the monitor, camera, mic, etc..
 snapshot --monitor HDMI-1 \
   --camera /dev/video0 \
@@ -34,7 +38,7 @@ snapshot --monitor HDMI-1 \
 snapshot --devices
 ```
 
-Press <kbd>Ctrl</kbd> + <kbd>C</kbd> to stop recording and export the MP4.
+Press <kbd>Ctrl</kbd> + <kbd>C</kbd> to stop recording and save the output.
 
 ## Options
 
@@ -42,6 +46,7 @@ The cli accepts this parameters:
 
 | Option                         | Default                         | Explanation                                                                                                                                                                           |
 |--------------------------------|---------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `--export FORMAT` | `mp4` | Export a combined `mp4` or an editable `kdenlive` project with multistream MKV media. |
 | `--monitor NAME`               | Primary monitor                 | Select the screen to record, such as `HDMI-1`.                                                                                                                                        |
 | `--camera DEVICE`              | `/dev/video0`                   | Select the webcam device.                                                                                                                                                             |
 | `--mic SOURCE`                 | `default`                       | Select the PulseAudio/PipeWire audio source.                                                                                                                                          |

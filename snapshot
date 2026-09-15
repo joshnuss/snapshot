@@ -5,9 +5,10 @@ set -Eeuo pipefail
 die() { printf 'Error: %s\n' "$*" >&2; exit 1; }
 usage() {
   cat <<'EOF'
-Usage: ./snapshot [options] [output.mp4 | path/to/dir]
+Usage: ./snapshot [options] [output-file | path/to/dir]
 
 Records the XRandR primary monitor, webcam and microphone; press Ctrl+C to finish.
+  --export FORMAT        mp4 (default) or kdenlive
   --devices                 Show monitor, camera and microphone choices
   --monitor NAME         Override the primary monitor (e.g. DP-1)
   --camera DEVICE        Webcam device (default: /dev/video0)
@@ -27,7 +28,7 @@ Records the XRandR primary monitor, webcam and microphone; press Ctrl+C to finis
   --dry-run              Print capture/export commands without recording
   -h, --help             Show this help
 
-Default output: ./recording-YYYYmmdd-HHMMSS.mp4
+Default output: ./recording-YYYYmmdd-HHMMSS.mp4 (or .kdenlive with --export kdenlive)
 EOF
 }
 
@@ -87,7 +88,7 @@ show_devices() {
 }
 
 monitor='' camera=/dev/video0 mic=default camera_size=640x480 camera_fps=30
-camera_format='' fps=30 size=600 margin=24 position=bottom-right mirror=1 dry=0 tray=1
+camera_format='' fps=30 size=600 margin=24 position=bottom-right mirror=1 dry=0 tray=1 export=mp4
 output=''
 while (($#)); do
   case "$1" in
@@ -96,13 +97,23 @@ while (($#)); do
     --no-tray) tray=0; shift ;;
     --no-mirror) mirror=0; shift ;;
     --dry-run) dry=1; shift ;;
-    --monitor|--camera|--mic|--camera-size|--camera-fps|--camera-format|--fps|--overlay-size|--overlay-margin|--overlay-position)
+    --export|--monitor|--camera|--mic|--camera-size|--camera-fps|--camera-format|--fps|--overlay-size|--overlay-margin|--overlay-position)
       (($# >= 2)) || die "Missing value for $1"
       key=${1#--}; key=${key#overlay-}; key=${key//-/_}; printf -v "$key" '%s' "$2"; shift 2 ;;
     -*) die "Unknown option: $1" ;;
     *) [[ -z $output ]] || die 'Only one output path is allowed'; output=$1; shift ;;
   esac
 done
+case "$export" in
+  mp4|kdenlive) ;;
+  *) die 'export must be mp4 or kdenlive' ;;
+esac
+script_dir=$(dirname "$(readlink -f -- "${BASH_SOURCE[0]}")")
+if [[ $export == kdenlive ]]; then
+  command -v python3 >/dev/null || die 'Kdenlive export requires Python 3.'
+  command -v ffprobe >/dev/null || die 'Kdenlive export requires ffprobe.'
+  [[ -f $script_dir/kdenlive.py ]] || die 'Keep kdenlive.py beside snapshot.'
+fi
 command -v ffmpeg >/dev/null || die 'Install ffmpeg first.'
 for key in fps camera_fps size; do
   [[ ${!key} =~ ^[1-9][0-9]*$ ]] || die "$key must be a positive integer"
@@ -126,14 +137,16 @@ case "$vertical" in
   bottom) overlay_y="H-h-$margin" ;;
 esac
 if [[ -z $output || -d $output ]]; then
-  output="${output:-.}/recording-$(date +%Y%m%d-%H%M%S).mp4"
+  output="${output:-.}/recording-$(date +%Y%m%d-%H%M%S).$export"
 fi
 if [[ ${output##*/} != *.* ]]; then
-  printf 'Warning: output filename has no extension: %s (writing MP4).\n' "$output" >&2
+  printf 'Warning: output filename has no extension: %s (writing %s).\n' "$output" "$export" >&2
 fi
 [[ $output == /* ]] || output="$PWD/$output"
-intermediate=${output%.mp4}.mkv
-[[ ! -e $output && ! -e $intermediate ]] || die 'Output MP4 or intermediate MKV already exists; choose another filename.'
+stem=${output%.$export}
+intermediate=$stem.mkv
+[[ $intermediate != "$output" ]] || intermediate=$output.source.mkv
+[[ ! -e $output && ! -e $intermediate ]] || die 'Output or intermediate MKV already exists; choose another filename.'
 
 [[ ${XDG_SESSION_TYPE:-x11} != wayland ]] || die 'This script requires an X11 session. Log into an Xorg session; x11grab cannot capture a Wayland desktop.'
 [[ -n ${DISPLAY:-} ]] || die 'DISPLAY is unset; run this in your desktop terminal.'
@@ -168,25 +181,45 @@ inputs=(-thread_queue_size 8 -use_wallclock_as_timestamps 1 -f x11grab -probesiz
         -thread_queue_size 8 -use_wallclock_as_timestamps 1 -f v4l2 -probesize 32 -analyzeduration 0
         -framerate "$camera_fps" -video_size "$camera_size")
 [[ -z $camera_format ]] || inputs+=(-input_format "$camera_format")
+if [[ $export == kdenlive ]]; then
+  inputs+=(-isync 0)
+fi
 inputs+=(-i "$camera" -thread_queue_size 512 -use_wallclock_as_timestamps 1
-         -f pulse -i "$mic")
+         -f pulse)
+[[ $export != kdenlive ]] || inputs+=(-isync 0)
+inputs+=(-i "$mic")
 ((size + 2 * margin <= width && size + 2 * margin <= height)) || die 'Circle and margin must fit inside the selected monitor.'
 flip=''; ((mirror)) && flip='hflip,'
 graph="[1:v]crop='min(iw,ih)':'min(iw,ih)',scale=$size:$size,setsar=1,${flip}format=yuv420p,split[cam][masksrc];[masksrc]trim=end_frame=1,format=gray,geq=lum='255*clip($size/2-hypot(X-(W-1)/2,Y-(H-1)/2),0,1)',loop=loop=-1:size=1:start=0,setpts=N/($camera_fps*TB)[mask];[cam][mask]alphamerge=shortest=1[face];[0:v][face]overlay=x=$overlay_x:y=$overlay_y:eof_action=pass,scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p[v];[2:a]aresample=async=1:first_pts=0[a]"
 capture=(ffmpeg -hide_banner -nostdin -n -copyts -start_at_zero "${inputs[@]}"
          -filter_complex_threads 1 -filter_complex "$graph" -map '[v]' -map '[a]'
          -c:v libx264 -preset ultrafast -tune zerolatency -crf 20 -r "$fps" -c:a aac -b:a 160k)
+if [[ $export == kdenlive ]]; then
+  capture=(ffmpeg -hide_banner -nostdin -n -copyts -start_at_zero "${inputs[@]}"
+           -map 0:v:0 -map 1:v:0 -map 2:a:0
+           -filter:v:0 'scale=trunc(iw/2)*2:trunc(ih/2)*2'
+           -filter:v:1 'scale=trunc(iw/2)*2:trunc(ih/2)*2'
+           -c:v libx264 -preset ultrafast -tune zerolatency -crf 20 -pix_fmt yuv420p
+           -fps_mode:v passthrough -c:a aac -b:a 160k -af aresample=async=1
+           -metadata:s:v:0 title=Screen -metadata:s:v:1 title=Webcam
+           -metadata:s:a:0 title=Microphone)
+fi
 capture+=("$intermediate")
 export_cmd=(ffmpeg -hide_banner -nostdin -n -i "$intermediate" -map 0 -c copy -movflags +faststart -f mp4 "$output")
+if [[ $export == kdenlive ]]; then
+  export_cmd=(python3 "$script_dir/kdenlive.py" "$intermediate" "$output"
+              --fps "$fps" --size "$size" --margin "$margin" --position "$position")
+  ((mirror)) || export_cmd+=(--no-mirror)
+fi
 if ((dry)); then
   printf '%q ' "${capture[@]}"; printf '\n'
   printf '%q ' "${export_cmd[@]}"; printf '\n'
   exit 0
 fi
 mkdir -p "$(dirname "$output")"
-printf 'Recording to %s\nPress Ctrl+C to stop and export MP4.\n' "$intermediate"
+printf 'Recording to %s\nPress Ctrl+C to stop and export.\n' "$intermediate"
 # FFmpeg handles Ctrl+C by finalizing the file; continue to remux afterward.
-log=${output%.mp4}.capture.log
+log=$stem.capture.log
 printf 'Capture log: %s\n' "$log"
 stop_requested=0
 trap 'stop_requested=1' INT USR1
