@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Linux/X11 screen + circular webcam + microphone recorder.
+# Linux/X11 screen + circular webcam + microphone/system-audio recorder.
 set -Eeuo pipefail
 
 die() { printf 'Error: %s\n' "$*" >&2; exit 1; }
@@ -13,6 +13,8 @@ Records the XRandR primary monitor, webcam and microphone; press Ctrl+C to finis
   --monitor NAME         Override the primary monitor (e.g. DP-1)
   --camera DEVICE        Webcam device (default: /dev/video0)
   --mic SOURCE           PulseAudio/PipeWire source (default: default)
+  --system-audio SOURCE  Record an output-monitor source (default: default).
+                         "default" selects the default output's monitor.
   --camera-size WxH      Supported webcam mode (default: 640x480)
   --camera-fps N         Supported webcam frame rate (default: 30)
   --camera-format FMT    Optional input format, e.g. mjpeg or yuyv422
@@ -25,6 +27,7 @@ Records the XRandR primary monitor, webcam and microphone; press Ctrl+C to finis
                          bottom-left, bottom-center, bottom-right
   --no-tray              Disable the recording tray icon
   --no-mirror            Disable webcam horizontal mirroring
+  --no-system-audio      Disable system-audio recording
   --dry-run              Print capture/export commands without recording
   -h, --help             Show this help
 
@@ -70,7 +73,7 @@ show_devices() {
     ((found)) || printf '  No cameras found.\n'
   fi
 
-  printf '\nAudio sources  (--mic SOURCE)\n'
+  printf '\nAudio sources  (--mic SOURCE / --system-audio SOURCE)\n'
   if command -v pactl >/dev/null && listing=$(pactl list short sources 2>/dev/null); then
     default_source=$(pactl get-default-source 2>/dev/null) || default_source=''
     awk -v selected="$default_source" '
@@ -84,10 +87,10 @@ show_devices() {
   else
     printf '  Unavailable. Check PulseAudio/PipeWire and install pulseaudio-utils.\n'
   fi
-  printf '\nUse the names above with --monitor, --camera, and --mic.\n\n'
+  printf '\nUse the names above with --monitor, --camera, --mic, and --system-audio.\n\n'
 }
 
-monitor='' camera=/dev/video0 mic=default camera_size=640x480 camera_fps=30
+monitor='' camera=/dev/video0 mic=default system_audio=default camera_size=640x480 camera_fps=30
 camera_format='' fps=30 size=600 margin=24 position=bottom-right mirror=1 dry=0 tray=1 export=mp4
 output=''
 while (($#)); do
@@ -96,8 +99,9 @@ while (($#)); do
     --devices) show_devices; exit 0 ;;
     --no-tray) tray=0; shift ;;
     --no-mirror) mirror=0; shift ;;
+    --no-system-audio) system_audio=''; shift ;;
     --dry-run) dry=1; shift ;;
-    --export|--monitor|--camera|--mic|--camera-size|--camera-fps|--camera-format|--fps|--overlay-size|--overlay-margin|--overlay-position)
+    --export|--monitor|--camera|--mic|--system-audio|--camera-size|--camera-fps|--camera-format|--fps|--overlay-size|--overlay-margin|--overlay-position)
       (($# >= 2)) || die "Missing value for $1"
       key=${1#--}; key=${key#overlay-}; key=${key//-/_}; printf -v "$key" '%s' "$2"; shift 2 ;;
     -*) die "Unknown option: $1" ;;
@@ -170,12 +174,19 @@ if [[ $mic == default ]] && command -v pactl >/dev/null; then
   resolved_mic=$(pactl get-default-source 2>/dev/null) || resolved_mic=''
   [[ -z $resolved_mic ]] || mic=$resolved_mic
 fi
+if [[ $system_audio == default ]]; then
+  command -v pactl >/dev/null || die 'Resolving default system audio requires pactl (pulseaudio-utils).'
+  default_sink=$(pactl get-default-sink 2>/dev/null) || default_sink=''
+  [[ -n $default_sink ]] || die 'Cannot determine the default audio output. Use --devices and pass its monitor source.'
+  system_audio=$default_sink.monitor
+fi
 camera_node=$(readlink -f -- "$camera")
 camera_label=''
 if [[ -r /sys/class/video4linux/${camera_node##*/}/name ]]; then
   camera_label=$(cat "/sys/class/video4linux/${camera_node##*/}/name")
 fi
 printf 'Webcam: %s%s\nMicrophone source: %s\n' "$camera" "${camera_label:+ ($camera_label)}" "$mic"
+[[ -z $system_audio ]] || printf 'System audio source: %s\n' "$system_audio"
 inputs=(-thread_queue_size 8 -use_wallclock_as_timestamps 1 -f x11grab -probesize 32 -analyzeduration 0
         -framerate "$fps" -video_size "${width}x${height}" -draw_mouse 1 -i "${DISPLAY}+${x},${y}"
         -thread_queue_size 8 -use_wallclock_as_timestamps 1 -f v4l2 -probesize 32 -analyzeduration 0
@@ -188,21 +199,37 @@ inputs+=(-i "$camera" -thread_queue_size 512 -use_wallclock_as_timestamps 1
          -f pulse)
 [[ $export != kdenlive ]] || inputs+=(-isync 0)
 inputs+=(-i "$mic")
+if [[ -n $system_audio ]]; then
+  inputs+=(-thread_queue_size 512 -use_wallclock_as_timestamps 1 -f pulse)
+  [[ $export != kdenlive ]] || inputs+=(-isync 0)
+  inputs+=(-i "$system_audio")
+fi
 ((size + 2 * margin <= width && size + 2 * margin <= height)) || die 'Circle and margin must fit inside the selected monitor.'
 flip=''; ((mirror)) && flip='hflip,'
-graph="[1:v]crop='min(iw,ih)':'min(iw,ih)',scale=$size:$size,setsar=1,${flip}format=yuv420p,split[cam][masksrc];[masksrc]trim=end_frame=1,format=gray,geq=lum='255*clip($size/2-hypot(X-(W-1)/2,Y-(H-1)/2),0,1)',loop=loop=-1:size=1:start=0,setpts=N/($camera_fps*TB)[mask];[cam][mask]alphamerge=shortest=1[face];[0:v][face]overlay=x=$overlay_x:y=$overlay_y:eof_action=pass,scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p[v];[2:a]aresample=async=1:first_pts=0[a]"
+graph="[1:v]crop='min(iw,ih)':'min(iw,ih)',scale=$size:$size,setsar=1,${flip}format=yuv420p,split[cam][masksrc];[masksrc]trim=end_frame=1,format=gray,geq=lum='255*clip($size/2-hypot(X-(W-1)/2,Y-(H-1)/2),0,1)',loop=loop=-1:size=1:start=0,setpts=N/($camera_fps*TB)[mask];[cam][mask]alphamerge=shortest=1[face];[0:v][face]overlay=x=$overlay_x:y=$overlay_y:eof_action=pass,scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p[v];"
+if [[ -n $system_audio ]]; then
+  graph+='[2:a][3:a]amix=inputs=2:duration=longest:normalize=0,aresample=async=1:first_pts=0[a]'
+else
+  graph+='[2:a]aresample=async=1:first_pts=0[a]'
+fi
 capture=(ffmpeg -hide_banner -nostdin -n -copyts -start_at_zero "${inputs[@]}"
          -filter_complex_threads 1 -filter_complex "$graph" -map '[v]' -map '[a]'
          -c:v libx264 -preset ultrafast -tune zerolatency -crf 20 -r "$fps" -c:a aac -b:a 160k)
 if [[ $export == kdenlive ]]; then
+  audio_maps=(-map 2:a:0)
+  audio_metadata=(-metadata:s:a:0 title=Microphone)
+  if [[ -n $system_audio ]]; then
+    audio_maps+=(-map 3:a:0)
+    audio_metadata+=(-metadata:s:a:1 'title=System Audio')
+  fi
   capture=(ffmpeg -hide_banner -nostdin -n -copyts -start_at_zero "${inputs[@]}"
-           -map 0:v:0 -map 1:v:0 -map 2:a:0
+           -map 0:v:0 -map 1:v:0 "${audio_maps[@]}"
            -filter:v:0 'scale=trunc(iw/2)*2:trunc(ih/2)*2'
            -filter:v:1 'scale=trunc(iw/2)*2:trunc(ih/2)*2'
            -c:v libx264 -preset ultrafast -tune zerolatency -crf 20 -pix_fmt yuv420p
            -fps_mode:v passthrough -c:a aac -b:a 160k -af aresample=async=1
            -metadata:s:v:0 title=Screen -metadata:s:v:1 title=Webcam
-           -metadata:s:a:0 title=Microphone)
+           "${audio_metadata[@]}")
 fi
 capture+=("$intermediate")
 export_cmd=(ffmpeg -hide_banner -nostdin -n -i "$intermediate" -map 0 -c copy -movflags +faststart -f mp4 "$output")

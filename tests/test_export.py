@@ -45,6 +45,11 @@ class ExportTest(unittest.TestCase):
             bins = base / 'bin'
             bins.mkdir()
             (bins / 'xrandr').write_text('#!/bin/sh\necho "HDMI-1 connected primary 1280x720+0+0"\n')
+            (bins / 'pactl').write_text('''#!/bin/sh
+if [ "$1" = get-default-sink ]; then
+    echo test-output
+fi
+''')
             # Preserve the output mapping/encoding from the actual CLI, replacing
             # only hardware capture with a short, deterministic source.
             (bins / 'ffmpeg').write_text('''#!/usr/bin/env python3
@@ -53,7 +58,10 @@ args=sys.argv[1:]
 if 'x11grab' in args:
     tail=args[args.index('-filter_complex_threads'):] if '-filter_complex_threads' in args else args[args.index('-map'):]
     args=['-hide_banner','-nostdin','-n','-f','lavfi','-i','color=blue:s=1280x720:r=15',
-          '-f','lavfi','-i','testsrc2=s=640x480:r=15','-f','lavfi','-i','sine=frequency=440']+tail[:-1]+['-t','1',tail[-1]]
+          '-f','lavfi','-i','testsrc2=s=640x480:r=15','-f','lavfi','-i','sine=frequency=440']
+    if any('3:a' in value for value in args + tail):
+        args += ['-f','lavfi','-i','sine=frequency=880']
+    args += tail[:-1]+['-t','1',tail[-1]]
 os.execv('/usr/bin/ffmpeg',['ffmpeg']+args)
 ''')
             for path in bins.iterdir():
@@ -65,17 +73,22 @@ os.execv('/usr/bin/ffmpeg',['ffmpeg']+args)
                 if mode == 'kdenlive':
                     # MP4 mode retains the same stem's MKV; use another name.
                     output = base / 'editable.kdenlive'
-                run = subprocess.run([str(ROOT/'snapshot'), '--no-tray', '--export', mode,
-                    '--camera', '/dev/zero', '--mic', 'test', '--fps', '15', str(output)],
+                command = [str(ROOT/'snapshot'), '--no-tray', '--export', mode,
+                    '--camera', '/dev/zero', '--mic', 'test', '--fps', '15']
+                run = subprocess.run(command + [str(output)],
                     env=env, capture_output=True, text=True)
                 self.assertEqual(run.returncode, 0, run.stderr)
+                self.assertIn('System audio source: test-output.monitor', run.stdout)
                 self.assertTrue(output.is_file())
                 if mode == 'kdenlive':
                     tree = ET.parse(output)
                     self.assertEqual(tree.find('profile').get('description'), 'Snapshot 1280x720 15 fps')
-                    self.assertEqual(len(tree.findall('./chain')), 3)
+                    self.assertEqual(len(tree.findall('./chain')), 4)
                     self.assertEqual(tree.find("./chain[@id='webcam']/property[@name='vstream']").text, '1')
                     self.assertEqual(tree.find("./chain[@id='mic']/property[@name='astream']").text, '0')
+                    self.assertEqual(tree.find("./chain[@id='system_audio']/property[@name='astream']").text, '1')
+                    self.assertEqual(tree.find("./tractor[@id='system_audio_track']/property[@name='kdenlive:track_name']").text,
+                                     'System Audio')
                     self.assertEqual(len(tree.findall('./tractor[@id="webcam_track"]')), 1)
                     effects = tree.findall('.//filter/property[@name="mlt_service"]')
                     self.assertEqual([e.text for e in effects], ['avfilter.hflip', 'frei0r.alphaspot', 'qtblend'])

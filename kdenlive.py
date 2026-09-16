@@ -28,8 +28,9 @@ def generate(media, output, fps, size, margin, position, mirror):
         'ffprobe', '-v', 'error', '-show_streams', '-show_format', '-of', 'json', str(media)]))
     videos = [s for s in probe['streams'] if s['codec_type'] == 'video']
     audios = [s for s in probe['streams'] if s['codec_type'] == 'audio']
-    if len(videos) != 2 or len(audios) != 1:
-        raise ValueError('Expected separate screen, webcam, and microphone streams (2 video + 1 audio).')
+    if len(videos) != 2 or len(audios) not in (1, 2):
+        raise ValueError('Expected screen, webcam, microphone, and optional system audio '
+                         'streams (2 video + 1 or 2 audio).')
     duration = float(probe['format']['duration'])
     source_frames = max(1, math.ceil(duration * fps))
     # Round up to a common capture time at which every input is available.
@@ -52,20 +53,24 @@ def generate(media, output, fps, size, margin, position, mirror):
     # MLT's video producers count from the selected video's first timestamp;
     # its audio-only producer retains the container timeline. Convert the common
     # capture interval to those producer coordinates below.
-    streams = [('mic', audios[0], 4), ('screen', videos[0], 2), ('webcam', videos[1], 3)]
-    for name, stream, bin_id in streams:
+    streams = [('mic', 'Microphone', audios[0], 4)]
+    if len(audios) == 2:
+        streams.append(('system_audio', 'System Audio', audios[1], 6))
+    streams.extend((('screen', 'Screen', videos[0], 2),
+                    ('webcam', 'Webcam', videos[1], 3)))
+    for name, label, stream, bin_id in streams:
         chain = ET.SubElement(root, 'chain', id=name, out=str(source_frames - 1))
-        audio = name == 'mic'
+        audio = stream['codec_type'] == 'audio'
         props(chain, {'resource': media.name, 'mlt_service': 'avformat', 'length': source_frames,
             'eof': 'pause', 'seekable': 1, 'audio_index': stream['index'] if audio else -1,
             'video_index': -1 if audio else stream['index'],
             'vstream': -1 if audio else videos.index(stream),
             'astream': audios.index(stream) if audio else -1,
             'set.test_audio': 0 if audio else 1, 'set.test_image': 1 if audio else 0,
-            'kdenlive:id': bin_id, 'kdenlive:clipname': name.capitalize(),
+            'kdenlive:id': bin_id, 'kdenlive:clipname': label,
             'kdenlive:clip_type': 1 if audio else 2, 'kdenlive:folderid': -1})
-    for name, stream, bin_id in streams:
-        audio = name == 'mic'
+    for name, label, stream, bin_id in streams:
+        audio = stream['codec_type'] == 'audio'
         playlist = ET.SubElement(root, 'playlist', id=name + '_clips')
         if audio:
             props(playlist, {'kdenlive:audio_track': 1})
@@ -102,7 +107,7 @@ def generate(media, output, fps, size, margin, position, mirror):
         if audio:
             props(empty, {'kdenlive:audio_track': 1})
         track = ET.SubElement(root, 'tractor', id=name + '_track', **{'in': '0', 'out': str(frames-1)})
-        props(track, {'kdenlive:track_name': name.capitalize(), 'kdenlive:trackheight': 80,
+        props(track, {'kdenlive:track_name': label, 'kdenlive:trackheight': 80,
                       'kdenlive:timeline_active': 1, **({'kdenlive:audio_track': 1} if audio else {})})
         for suffix in ('_clips', '_mix'):
             ET.SubElement(track, 'track', producer=name + suffix, hide='video' if audio else 'audio')
@@ -110,19 +115,20 @@ def generate(media, output, fps, size, margin, position, mirror):
     props(sequence, {'kdenlive:uuid': uid, 'kdenlive:id': 5, 'kdenlive:clipname': output.stem + ' (timeline)',
         'kdenlive:producer_type': 17, 'kdenlive:maxduration': frames,
         'kdenlive:sequenceproperties.documentuuid': uid, 'kdenlive:sequenceproperties.hasAudio': 1,
-        'kdenlive:sequenceproperties.hasVideo': 1, 'kdenlive:sequenceproperties.tracksCount': 3,
-        'kdenlive:sequenceproperties.activeTrack': 2, 'kdenlive:sequenceproperties.audioTarget': 0,
+        'kdenlive:sequenceproperties.hasVideo': 1, 'kdenlive:sequenceproperties.tracksCount': len(streams),
+        'kdenlive:sequenceproperties.activeTrack': len(streams) - 1, 'kdenlive:sequenceproperties.audioTarget': 0,
         'kdenlive:sequenceproperties.videoTarget': 1, 'kdenlive:sequenceproperties.position': 0,
         'kdenlive:sequenceproperties.zonein': 0, 'kdenlive:sequenceproperties.zoneout': frames,
         'kdenlive:sequenceproperties.groups': '[]',
         'snapshot:trim_start_frames': trim_start})
     ET.SubElement(sequence, 'track', producer='black')
-    for index, (name, _, _) in enumerate(streams, 1):
+    for index, (name, _, stream, _) in enumerate(streams, 1):
+        audio = stream['codec_type'] == 'audio'
         ET.SubElement(sequence, 'track', producer=name + '_track')
         props(ET.SubElement(sequence, 'transition'), {
-            'a_track': 0, 'b_track': index, 'mlt_service': 'mix' if name == 'mic' else 'qtblend',
+            'a_track': 0, 'b_track': index, 'mlt_service': 'mix' if audio else 'qtblend',
             'internal_added': 237, 'always_active': 1,
-            **({'sum': 1, 'accepts_blanks': 1} if name == 'mic' else {'compositing': 0, 'distort': 0})})
+            **({'sum': 1, 'accepts_blanks': 1} if audio else {'compositing': 0, 'distort': 0})})
     main_bin = ET.SubElement(root, 'playlist', id='main_bin')
     props(main_bin, {'xml_retain': 1, 'kdenlive:docproperties.version': '1.1',
         'kdenlive:docproperties.kdenliveversion': '23.08.5',
@@ -130,7 +136,7 @@ def generate(media, output, fps, size, margin, position, mirror):
         'kdenlive:docproperties.uuid': uid, 'kdenlive:docproperties.activetimeline': uid,
         'kdenlive:docproperties.opensequences': uid, 'kdenlive:docproperties.audioChannels': 2,
         'kdenlive:docproperties.compositing': 1})
-    for name in ('screen', 'webcam', 'mic', 'sequence'):
+    for name in ('screen', 'webcam', 'mic') + (('system_audio',) if len(audios) == 2 else ()) + ('sequence',):
         ET.SubElement(main_bin, 'entry', producer=name,
                       **{'in': '0', 'out': str((frames if name == 'sequence' else source_frames)-1)})
     wrapper = ET.SubElement(root, 'tractor', id='project', **{'in': '0', 'out': str(frames-1)})
