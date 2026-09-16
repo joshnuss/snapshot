@@ -111,6 +111,13 @@ def generate(media, output, fps, size, margin, position, mirror):
                       'kdenlive:timeline_active': 1, **({'kdenlive:audio_track': 1} if audio else {})})
         for suffix in ('_clips', '_mix'):
             ET.SubElement(track, 'track', producer=name + suffix, hide='video' if audio else 'audio')
+    groups = json.dumps([{
+        'type': 'Normal',
+        'children': [
+            {'type': 'Leaf', 'leaf': 'clip', 'data': f'{track}:0:-1'}
+            for track in range(len(streams))
+        ],
+    }], separators=(',', ':'))
     sequence = ET.SubElement(root, 'tractor', id='sequence', **{'in': '0', 'out': str(frames-1)})
     props(sequence, {'kdenlive:uuid': uid, 'kdenlive:id': 5, 'kdenlive:clipname': output.stem + ' (timeline)',
         'kdenlive:producer_type': 17, 'kdenlive:maxduration': frames,
@@ -119,7 +126,7 @@ def generate(media, output, fps, size, margin, position, mirror):
         'kdenlive:sequenceproperties.activeTrack': len(streams) - 1, 'kdenlive:sequenceproperties.audioTarget': 0,
         'kdenlive:sequenceproperties.videoTarget': 1, 'kdenlive:sequenceproperties.position': 0,
         'kdenlive:sequenceproperties.zonein': 0, 'kdenlive:sequenceproperties.zoneout': frames,
-        'kdenlive:sequenceproperties.groups': '[]',
+        'kdenlive:sequenceproperties.groups': groups,
         'snapshot:trim_start_frames': trim_start})
     ET.SubElement(sequence, 'track', producer='black')
     for index, (name, _, stream, _) in enumerate(streams, 1):

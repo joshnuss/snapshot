@@ -37,6 +37,10 @@ class ExportTest(unittest.TestCase):
             entries = [tree.find(f"./playlist[@id='{name}_clips']/entry")
                        for name in ('screen', 'webcam', 'mic')]
             self.assertEqual(len({int(e.get('out')) - int(e.get('in')) for e in entries}), 1)
+            groups = json.loads(tree.find(
+                "./tractor[@id='sequence']/property[@name='kdenlive:sequenceproperties.groups']").text)
+            self.assertEqual([child['data'] for child in groups[0]['children']],
+                             ['0:0:-1', '1:0:-1', '2:0:-1'])
             self.assertGreater(expected, 0)
 
     def test_recording_modes(self):
@@ -89,6 +93,15 @@ os.execv('/usr/bin/ffmpeg',['ffmpeg']+args)
                     self.assertEqual(tree.find("./chain[@id='system_audio']/property[@name='astream']").text, '1')
                     self.assertEqual(tree.find("./tractor[@id='system_audio_track']/property[@name='kdenlive:track_name']").text,
                                      'System Audio')
+                    groups = json.loads(tree.find(
+                        "./tractor[@id='sequence']/property[@name='kdenlive:sequenceproperties.groups']").text)
+                    self.assertEqual(groups, [{
+                        'type': 'Normal',
+                        'children': [
+                            {'type': 'Leaf', 'leaf': 'clip', 'data': f'{track}:0:-1'}
+                            for track in range(4)
+                        ],
+                    }])
                     self.assertEqual(len(tree.findall('./tractor[@id="webcam_track"]')), 1)
                     effects = tree.findall('.//filter/property[@name="mlt_service"]')
                     self.assertEqual([e.text for e in effects], ['avfilter.hflip', 'frei0r.alphaspot', 'qtblend'])
