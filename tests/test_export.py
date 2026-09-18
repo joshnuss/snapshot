@@ -4,6 +4,7 @@ import json
 import math
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 import xml.etree.ElementTree as ET
@@ -26,8 +27,7 @@ class ExportTest(unittest.TestCase):
             probe = json.loads(subprocess.check_output(['ffprobe', '-v', 'error',
                 '-show_streams', '-of', 'json', str(media)]))
             expected = math.ceil(max(float(s['start_time']) for s in probe['streams']) * 15 - 1e-9)
-            helper = ROOT / 'snapshot-kdenlive'
-            exporter = [str(helper)] if helper.is_file() else ['python3', str(ROOT/'kdenlive.py')]
+            exporter = [sys.executable, str(Path(__file__).resolve().parents[1] / 'kdenlive.py')]
             subprocess.run(exporter + [str(media), str(project),
                 '--fps', '15', '--size', '300', '--margin', '24', '--position', 'center'], check=True)
             tree = ET.parse(project)

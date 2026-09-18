@@ -22,19 +22,15 @@ jobs:
           .venv/bin/python -m pip install -r requirements-build.txt
       - name: Test source
         run: |
-          bash -n snapshot
           .venv/bin/python -m unittest discover -s tests -v
-      - name: Build Python helpers
+      - name: Build recorder
         run: |
-          .venv/bin/python -m PyInstaller --noconfirm --clean --onefile --name snapshot-kdenlive kdenlive.py
-          .venv/bin/python -m PyInstaller --noconfirm --clean packaging/tray.spec
+          .venv/bin/python -m PyInstaller --noconfirm --clean packaging/snapshot.spec
       - name: Assemble and test distribution
         run: |
           mkdir -p dist/snapshot-linux-x86_64
-          cp snapshot README.md dist/snapshot-kdenlive dist/snapshot-tray dist/snapshot-linux-x86_64/
+          cp README.md dist/snapshot dist/snapshot-linux-x86_64/
           dist/snapshot-linux-x86_64/snapshot --help
-          dist/snapshot-linux-x86_64/snapshot-kdenlive --help
-          env -u DISPLAY -u WAYLAND_DISPLAY dist/snapshot-linux-x86_64/snapshot-tray ffmpeg -version
           SNAPSHOT_TEST_ROOT="$PWD/dist/snapshot-linux-x86_64" .venv/bin/python -m unittest discover -s tests -v
           tar -C dist -czf dist/snapshot-linux-x86_64.tar.gz snapshot-linux-x86_64
           cd dist
