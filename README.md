@@ -67,30 +67,19 @@ The cli accepts this parameters:
 | `output.mp4` or `path/to/dir`  | `recording-YYYYmmdd-HHMMSS.mp4` | a filename or directory path                                                                                                                                                          |
 ## Install
 
-Download `snapshot-linux-x86_64.tar.gz` and `SHA256SUMS` from a GitHub release.
-The build targets x86-64 Linux with glibc 2.39 or newer (Ubuntu 24.04+).
+First, install dependencies
+
+```bash
+sudo apt install ffmpeg x11-xserver-utils pulseaudio-utils
+```
+
+Then, download `snapshot-linux-x86_64.tar.gz` from the [GitHub Releases](https://github.com/joshnuss/snapshot/releases).
 
 ```bash
 sha256sum -c SHA256SUMS
 tar -xzf snapshot-linux-x86_64.tar.gz
 ./snapshot-linux-x86_64/snapshot --help
 ```
-
-Keep `snapshot`, `snapshot-kdenlive`, and `snapshot-tray` together. The Python
-helpers include their Python runtime and the tray's GTK dependencies, so a separate
-Python installation is not required. Recording still needs an X11 session, Bash,
-FFmpeg/ffprobe 5.1+ (with x11grab, V4L2, PulseAudio and libx264 support), `xrandr`, and
-`pactl`. On Ubuntu, install these with:
-
-```bash
-sudo apt install ffmpeg x11-xserver-utils pulseaudio-utils
-```
-
-The recorder currently supports **Linux/X11 only**. PyInstaller supports Linux,
-macOS and Windows builds, but Snapshot's Bash recorder uses Linux-specific capture
-devices and utilities. Native macOS and Windows recording requires new capture
-backends; this workflow does not publish nonfunctional builds for those platforms.
-Wayland recording is also not supported.
 
 ## License
 
