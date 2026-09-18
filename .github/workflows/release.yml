@@ -1,0 +1,66 @@
+name: Build release
+
+on:
+  pull_request:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build and test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-venv python3-gi gir1.2-gtk-3.0 librsvg2-common ffmpeg
+          /usr/bin/python3 -m venv --system-site-packages .venv
+          .venv/bin/python -m pip install -r requirements-build.txt
+      - name: Test source
+        run: |
+          bash -n snapshot
+          .venv/bin/python -m unittest discover -s tests -v
+      - name: Build Python helpers
+        run: |
+          .venv/bin/python -m PyInstaller --noconfirm --clean --onefile --name snapshot-kdenlive kdenlive.py
+          .venv/bin/python -m PyInstaller --noconfirm --clean packaging/tray.spec
+      - name: Assemble and test distribution
+        run: |
+          mkdir -p dist/snapshot-linux-x86_64
+          cp snapshot README.md dist/snapshot-kdenlive dist/snapshot-tray dist/snapshot-linux-x86_64/
+          dist/snapshot-linux-x86_64/snapshot --help
+          dist/snapshot-linux-x86_64/snapshot-kdenlive --help
+          env -u DISPLAY -u WAYLAND_DISPLAY dist/snapshot-linux-x86_64/snapshot-tray ffmpeg -version
+          SNAPSHOT_TEST_ROOT="$PWD/dist/snapshot-linux-x86_64" .venv/bin/python -m unittest discover -s tests -v
+          tar -C dist -czf dist/snapshot-linux-x86_64.tar.gz snapshot-linux-x86_64
+          cd dist
+          sha256sum snapshot-linux-x86_64.tar.gz > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: snapshot-linux-x86_64
+          path: |
+            dist/snapshot-linux-x86_64.tar.gz
+            dist/SHA256SUMS
+          if-no-files-found: error
+
+  upload:
+    if: github.event_name == 'release'
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: snapshot-linux-x86_64
+          path: dist
+      - name: Attach builds to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$RELEASE_TAG" dist/snapshot-linux-x86_64.tar.gz dist/SHA256SUMS --clobber

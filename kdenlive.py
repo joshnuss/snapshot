@@ -9,6 +9,8 @@ import time
 import uuid
 import xml.etree.ElementTree as ET
 
+from process_env import system_program_env
+
 
 def props(node, values):
     for key, value in values.items():
@@ -25,7 +27,8 @@ def effect(entry, service, name, values):
 
 def generate(media, output, fps, size, margin, position, mirror):
     probe = json.loads(subprocess.check_output([
-        'ffprobe', '-v', 'error', '-show_streams', '-show_format', '-of', 'json', str(media)]))
+        'ffprobe', '-v', 'error', '-show_streams', '-show_format', '-of', 'json', str(media)],
+        env=system_program_env()))
     videos = [s for s in probe['streams'] if s['codec_type'] == 'video']
     audios = [s for s in probe['streams'] if s['codec_type'] == 'audio']
     if len(videos) != 2 or len(audios) not in (1, 2):

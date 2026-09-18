@@ -3,3 +3,7 @@
 *.kdenlive
 *.log
 __pycache__
+/build/
+/dist/
+/.venv/
+/*.spec

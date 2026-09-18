@@ -6,6 +6,8 @@ import subprocess
 import sys
 import time
 
+from process_env import system_program_env
+
 
 def main():
     command = sys.argv[1:]
@@ -25,7 +27,7 @@ def main():
     signal.signal(signal.SIGINT, stop)
     signal.signal(signal.SIGTERM, stop)
     # Separate group prevents terminal Ctrl+C reaching FFmpeg twice.
-    child = subprocess.Popen(command, start_new_session=True)
+    child = subprocess.Popen(command, start_new_session=True, env=system_program_env())
     if stopping:
         child.send_signal(signal.SIGINT)
     try:
@@ -53,7 +55,7 @@ def main():
         def clicked(*_):
             if not stopping and child.poll() is None:
                 # Tell the Bash wrapper this was an intentional stop.
-                os.kill(os.getppid(), signal.SIGUSR1)
+                os.kill(int(os.environ.get('SNAPSHOT_RECORDER_PID', os.getppid())), signal.SIGUSR1)
                 stop()
                 icon.set_tooltip_text('Snapshot: finishing recording…')
 

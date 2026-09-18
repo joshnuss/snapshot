@@ -114,9 +114,14 @@ case "$export" in
 esac
 script_dir=$(dirname "$(readlink -f -- "${BASH_SOURCE[0]}")")
 if [[ $export == kdenlive ]]; then
-  command -v python3 >/dev/null || die 'Kdenlive export requires Python 3.'
+  if [[ -x $script_dir/snapshot-kdenlive ]]; then
+    kdenlive_cmd=("$script_dir/snapshot-kdenlive")
+  else
+    command -v python3 >/dev/null || die 'Kdenlive export requires Python 3 or the bundled snapshot-kdenlive helper.'
+    [[ -f $script_dir/kdenlive.py ]] || die 'Keep kdenlive.py beside snapshot.'
+    kdenlive_cmd=(python3 "$script_dir/kdenlive.py")
+  fi
   command -v ffprobe >/dev/null || die 'Kdenlive export requires ffprobe.'
-  [[ -f $script_dir/kdenlive.py ]] || die 'Keep kdenlive.py beside snapshot.'
 fi
 command -v ffmpeg >/dev/null || die 'Install ffmpeg first.'
 for key in fps camera_fps size; do
@@ -234,7 +239,7 @@ fi
 capture+=("$intermediate")
 export_cmd=(ffmpeg -hide_banner -nostdin -n -i "$intermediate" -map 0 -c copy -movflags +faststart -f mp4 "$output")
 if [[ $export == kdenlive ]]; then
-  export_cmd=(python3 "$script_dir/kdenlive.py" "$intermediate" "$output"
+  export_cmd=("${kdenlive_cmd[@]}" "$intermediate" "$output"
               --fps "$fps" --size "$size" --margin "$margin" --position "$position")
   ((mirror)) || export_cmd+=(--no-mirror)
 fi
@@ -253,7 +258,10 @@ trap 'stop_requested=1' INT USR1
 status=0
 tray_helper="$(dirname "$(readlink -f -- "${BASH_SOURCE[0]}")")/tray.py"
 if ((tray)); then
-  if command -v python3 >/dev/null && [[ -f $tray_helper ]]; then
+  if [[ -x $script_dir/snapshot-tray ]]; then
+    # A one-file PyInstaller helper has a bootloader parent, not this shell.
+    capture=(env SNAPSHOT_RECORDER_PID="$$" "$script_dir/snapshot-tray" "${capture[@]}")
+  elif command -v python3 >/dev/null && [[ -f $tray_helper ]]; then
     capture=(python3 "$tray_helper" "${capture[@]}")
   else
     printf 'Tray unavailable: install Python 3 and keep tray.py beside snapshot. Use Ctrl+C to stop.\n' >&2

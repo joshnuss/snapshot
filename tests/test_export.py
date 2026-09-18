@@ -8,7 +8,7 @@ import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(os.environ.get('SNAPSHOT_TEST_ROOT', Path(__file__).resolve().parents[1]))
 
 
 class ExportTest(unittest.TestCase):
@@ -26,7 +26,9 @@ class ExportTest(unittest.TestCase):
             probe = json.loads(subprocess.check_output(['ffprobe', '-v', 'error',
                 '-show_streams', '-of', 'json', str(media)]))
             expected = math.ceil(max(float(s['start_time']) for s in probe['streams']) * 15 - 1e-9)
-            subprocess.run(['python3', str(ROOT/'kdenlive.py'), str(media), str(project),
+            helper = ROOT / 'snapshot-kdenlive'
+            exporter = [str(helper)] if helper.is_file() else ['python3', str(ROOT/'kdenlive.py')]
+            subprocess.run(exporter + [str(media), str(project),
                 '--fps', '15', '--size', '300', '--margin', '24', '--position', 'center'], check=True)
             tree = ET.parse(project)
             for name, stream in zip(('screen', 'webcam', 'mic'), probe['streams']):
