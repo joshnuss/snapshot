@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+<title>Record, Edit, Render</title><desc>Record your camera, screen and microphone, edit in Kdenlive, then render an MP4 video.</desc>
+<defs><radialGradient id="glow"><stop stop-color="#20394c"/><stop offset="1" stop-color="#0c121b"/></radialGradient></defs>
+<rect width="1600" height="900" fill="#0c121b"/><ellipse cx="800" cy="390" rx="800" ry="570" fill="url(#glow)"/>
+<g font-family="Lato, sans-serif"><circle cx="105" cy="107" r="7" fill="#77e6c0"/><text x="127" y="115" font-size="25" font-weight="700" letter-spacing="4" fill="#c5d2e2">SNAPSHOT</text>
+<text x="96" y="205" font-size="54" font-weight="700" fill="#f1f5fa">CLI for video capture</text>
+<rect x="96" y="279" width="328" height="420" rx="28" fill="#141f2b" stroke="#2b3a4b" stroke-width="2"/><text x="124" y="325" font-size="20" font-weight="700" fill="#77e6c0" letter-spacing="2">01</text>
+<rect x="636" y="279" width="328" height="420" rx="28" fill="#141f2b" stroke="#2b3a4b" stroke-width="2"/><text x="664" y="325" font-size="20" font-weight="700" fill="#79baff" letter-spacing="2">02</text>
+<rect x="1176" y="279" width="328" height="420" rx="28" fill="#141f2b" stroke="#2b3a4b" stroke-width="2"/><text x="1204" y="325" font-size="20" font-weight="700" fill="#c1a5ff" letter-spacing="2">03</text>
+<rect x="136" y="415" width="72" height="72" rx="18" fill="#203a39"/>
+<g transform="translate(148 427) scale(2.0)"><g fill="none" stroke="#77e6c0" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m16 13l5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect width="14" height="12" x="2" y="6" rx="2"/></g></g>
+<rect x="224" y="415" width="72" height="72" rx="18" fill="#203a39"/>
+<g transform="translate(236 427) scale(2.0)"><g fill="none" stroke="#77e6c0" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8m-4-4v4"/></g></g>
+<rect x="312" y="415" width="72" height="72" rx="18" fill="#203a39"/>
+<g transform="translate(324 427) scale(2.0)"><g fill="none" stroke="#77e6c0" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M12 19v3m7-12v2a7 7 0 0 1-14 0v-2"/><rect width="6" height="13" x="9" y="2" rx="3"/></g></g>
+<g transform="translate(740 391) scale(5)"><path fill="#79baff" d="m8.727 1.554l2.727 4.334v16.558h1.091V5.889l2.728-4.335zm-6 4.948V9.8h7.091c.003-.83 0-1.672-.006-2.498c0-.383-.356-.732-.718-.8zm12.303.001c-.402.024-.835.41-.834.837l-.014 12.619c0 .57.767 1.065 1.207.727l8.28-6.331c.441-.335.44-1.12 0-1.455l-8.265-6.287a.55.55 0 0 0-.374-.11M-.001 12v3.299h9.818V12zm4.363 5.497v3.3h5.455v-3.3z"/></g>
+<g transform="translate(1280 389) scale(5.0)"><g fill="none" stroke="#c1a5ff" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M15.033 9.44a.647.647 0 0 1 0 1.12l-4.065 2.352a.645.645 0 0 1-.968-.56V7.648a.645.645 0 0 1 .967-.56zM12 17v4m-4 0h8"/><rect width="20" height="14" x="2" y="3" rx="2"/></g></g>
+<text x="260" y="605" text-anchor="middle" font-size="44" font-weight="700" fill="#f1f5fa">Record</text><text x="260" y="650" text-anchor="middle" font-size="24" fill="#9eafc3">Camera · Screen · Mic</text>
+<text x="800" y="605" text-anchor="middle" font-size="44" font-weight="700" fill="#f1f5fa">Edit</text><text x="800" y="650" text-anchor="middle" font-size="24" fill="#9eafc3">Kdenlive</text>
+<text x="1340" y="605" text-anchor="middle" font-size="44" font-weight="700" fill="#f1f5fa">Render</text><text x="1340" y="650" text-anchor="middle" font-size="24" fill="#9eafc3">.mp4</text>
+<path d="M476 489h108m-19-19 19 19-19 19" fill="none" stroke="#7a8ea6" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1016 489h108m-19-19 19 19-19 19" fill="none" stroke="#7a8ea6" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+
+<g aria-label="Terminal command: snapshot --export kdenlive">
+<rect x="894" y="77" width="610" height="139" rx="16" fill="#0a1018" stroke="#354559" stroke-width="2"/>
+<path d="M910 78H1488Q1503 78 1503 94V118H895V94Q895 78 910 78Z" fill="#1d2a39"/>
+<circle cx="917" cy="98" r="5" fill="#ed7b80"/><circle cx="935" cy="98" r="5" fill="#e7c477"/><circle cx="953" cy="98" r="5" fill="#77cba5"/>
+<text x="1199" y="104" text-anchor="middle" font-family="Lato, sans-serif" font-size="16" fill="#9eafc3">Terminal</text>
+<text xml:space="preserve" x="921" y="174" font-family="DejaVu Sans Mono, monospace" font-size="27" fill="#e7eef7"><tspan fill="#77e6c0">$&gt; </tspan>snapshot <tspan fill="#9eafc3">--export</tspan> <tspan fill="#79baff">kdenlive</tspan></text>
+</g>
+</g></svg>
